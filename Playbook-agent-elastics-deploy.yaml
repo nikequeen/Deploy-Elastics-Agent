@@ -1,6 +1,6 @@
 ---
 name: Install Elastic agent on servers
-hosts: servers
+hosts: All
 become: yes
 gather_facts: yes
 
