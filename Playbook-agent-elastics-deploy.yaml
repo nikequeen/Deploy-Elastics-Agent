@@ -1,3 +1,4 @@
+---
 name: Install Elastic agent on servers
 hosts: servers
 become: yes
@@ -14,72 +15,69 @@ vars:
     Windows_temp_dir: "C:\\temp\\elastic-agent"  # Pour Windows
     linux_temp_dir: "/tmp/elastic-agent"  # Pour Linux
 
----------------------------------------
 # Installation de l'agent pour les serveurs Windows
----------------------------------------
 
-tasks : 
-- name : create Windows repository 
-ansible.windows.win_file:
-        path: "{{ Windows_temp_dir }}"
-        state: directory
-      when: ansible_os_family == "Windows"
+tasks:
+- name: create Windows repository 
+  ansible.windows.win_file:
+    path: "{{ Windows_temp_dir }}"
+    state: directory
+  when: ansible_os_family == "Windows"
 
 - name: download elastics agents
-nsible.windows.win_shell: |
-        Expand-Archive -Path "{{ temp_dir }}\\elastic-agent-{{ elastic_agent_version }}-windows-x86_64.zip" -DestinationPath "{{ temp_dir }}"
-      when: ansible_os_family == "Windows"
+  ansible.windows.win_shell: |
+    Expand-Archive -Path "{{ Windows_temp_dir }}\\elastic-agent-{{ elastic_agent_version }}-windows-x86_64.zip" -DestinationPath "{{ Windows_temp_dir }}"
+  when: ansible_os_family == "Windows"
 
-- name : install elastics agents
-nsible.windows.win_shell: |
-        cd "{{ temp_dir }}\\elastic-agent-{{ elastic_agent_version }}-windows-x86_64"
-        .\elastic-agent.exe install --url={{ siem_url }} --enrollment-token={{ windows_enrollment_token }} --insecure
-      
+- name: install elastics agents
+  ansible.windows.win_shell: |
+    cd "{{ Windows_temp_dir }}\\elastic-agent-{{ elastic_agent_version }}-windows-x86_64"
+    .\elastic-agent.exe install --url={{ siem_url }} --enrollment-token={{ windows_enrollment_token }} --insecure
+  when: ansible_os_family == "Windows"
 
 - name: Configure 
-      ansible.windows.win_shell: |
-        sc.exe config "Elastic Agent" start= delayed-auto
-        sc.exe failure "Elastic Agent" reset= 0 actions= restart/30000/restart/30000/restart/30000
-      
-    - name: Nettoyer les fichiers temporaires Windows
-      ansible.windows.win_file:
-        path: "{{ temp_dir }}"
-        state: absent
-     
---------------------------------------------------
+  ansible.windows.win_shell: |
+    sc.exe config "Elastic Agent" start= delayed-auto
+    sc.exe failure "Elastic Agent" reset= 0 actions= restart/30000/restart/30000/restart/30000
+  when: ansible_os_family == "Windows"
+
+- name: Nettoyer les fichiers temporaires Windows
+  ansible.windows.win_file:
+    path: "{{ Windows_temp_dir }}"
+    state: absent
+  when: ansible_os_family == "Windows"
+
 # Installation de l'agent pour les serveurs linux
---------------------------------------------------
+- name: Créer le répertoire temporaire pour Linux
+  file:
+    path: "{{ linux_temp_dir }}"
+    state: directory
+    mode: '0755'
+  when: ansible_os_family == "Debian"
 
- - name: Créer le répertoire temporaire pour Linux
-      file:
-        path: "{{ linux_temp_dir }}"
-        state: directory
-        mode: '0755'
-      when: ansible_os_family == "Debian"
+- name: Télécharger l'agent Elastic pour Linux
+  get_url:
+    url: "{{ artifact_server }}/artifacts/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+    dest: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+    mode: '0644'
+  when: ansible_os_family == "Debian"
 
-    - name: Télécharger l'agent Elastic pour Linux
-      get_url:
-        url: "{{ artifact_server }}/artifacts/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
-        dest: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
-        mode: '0644'
-      when: ansible_os_family == "Debian"
+- name: Décompresser l'archive de l'agent Elastic pour Linux
+  unarchive:
+    src: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+    dest: "{{ linux_temp_dir }}"
+    remote_src: yes
+    creates: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
+  when: ansible_os_family == "Debian"
 
- name: Décompresser l'archive de l'agent Elastic pour Linux
-      unarchive:
-        src: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
-        dest: "{{ linux_temp_dir }}"
-        remote_src: yes
-        creates: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
-      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+- name: Install Elastic agent
+  shell: |
+    cd "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
+    sudo ./elastic-agent install --url={{ siem_url }} --enrollment-token={{ linux_enrollment_token }} --insecure
+  when: ansible_os_family == "Debian"
 
-    - name: Install Elastic agent
-      shell: |
-        cd "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
-        sudo ./elastic-agent install --url={{ siem_url }} --enrollment-token={{ linux_enrollment_token }} --insecure
-
-  - name: Nettoyer les fichiers temporaires Linux
-      file:
-        path: "{{ linux_temp_dir }}"
-        state: absent
-     
-
+- name: Nettoyer les fichiers temporaires Linux
+  file:
+    path: "{{ linux_temp_dir }}"
+    state: absent
+  when: ansible_os_family == "Debian"
