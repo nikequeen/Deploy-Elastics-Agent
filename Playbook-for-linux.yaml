@@ -1,0 +1,47 @@
+---
+- name: Install Elastic agent on servers
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    elastic_agent_version: "8.18.8"
+    artifact_server: "http://10.56.14.74:8443"
+    siem_url: "https://10.56.14.74:8220"
+    linux_enrollment_token: "QjhDN0daMEI5dU9fUE1XUVpvRjM6RnVBLUkyZ0lSMlNJOWRFR1FKQ0JqUQ=="
+    linux_temp_dir: "/tmp/elastic-agent"
+
+  tasks: # Installation de l'agent pour les serveurs linux
+    - name: Créer le répertoire temporaire pour Linux
+      file:
+        path: "{{ linux_temp_dir }}"
+        state: directory
+        mode: '0755'
+      when: ansible_os_family == "Debian"
+
+    - name: Télécharger l'agent Elastic pour Linux
+      get_url:
+        url: "{{ artifact_server }}/artifacts/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+        dest: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+        mode: '0644'
+      when: ansible_os_family == "Debian"
+
+    - name: Décompresser l'archive de l'agent Elastic pour Linux
+      unarchive:
+        src: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+        dest: "{{ linux_temp_dir }}"
+        remote_src: yes
+        creates: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
+      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+
+    - name: Install Elastic agent
+      shell: |
+        cd "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
+        sudo ./elastic-agent install --url={{ siem_url }} --enrollment-token={{ linux_enrollment_token }} --insecure
+      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+
+    - name: Nettoyer les fichiers temporaires Linux
+      file:
+        path: "{{ linux_temp_dir }}"
+        state: absent
+      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
