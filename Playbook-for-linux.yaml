@@ -11,20 +11,18 @@
     linux_enrollment_token: "QjhDN0daMEI5dU9fUE1XUVpvRjM6RnVBLUkyZ0lSMlNJOWRFR1FKQ0JqUQ=="
     linux_temp_dir: "/tmp/elastic-agent"
 
-  tasks: # Installation de l'agent pour les serveurs linux
+  tasks:
     - name: Créer le répertoire temporaire pour Linux
       file:
         path: "{{ linux_temp_dir }}"
         state: directory
         mode: '0755'
-      when: ansible_os_family == "Debian"
 
     - name: Télécharger l'agent Elastic pour Linux
       get_url:
         url: "{{ artifact_server }}/artifacts/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
         dest: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
         mode: '0644'
-      when: ansible_os_family == "Debian"
 
     - name: Décompresser l'archive de l'agent Elastic pour Linux
       unarchive:
@@ -32,16 +30,33 @@
         dest: "{{ linux_temp_dir }}"
         remote_src: yes
         creates: "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
-      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
 
-    - name: Install Elastic agent
+    - name: Install Elastic agent with force option (non-interactive)
       shell: |
-        cd "{{ linux_temp_dir }}/elastic-agent-{{ elastic_agent_version }}-linux-x86_64"
-        sudo ./elastic-agent install --url={{ siem_url }} --enrollment-token={{ linux_enrollment_token }} --insecure
-      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+        cd "{{ linux_temp_dir }}/elastic-agent/elastic-agent-8.18.8-linux-x86_64"
+        sudo ./elastic-agent install \
+          --url={{ siem_url }} \
+          --enrollment-token={{ linux_enrollment_token }} \
+          --insecure \
+          --force
+      register: install_result
+
+    - name: Display installation output
+      debug:
+        var: install_result.stdout_lines
+      when: install_result is defined
+
+    - name: Vérifier que l'agent Elastic est installé et en cours d'exécution
+      command: systemctl status elastic-agent
+      register: service_status
+      ignore_errors: yes
+
+    - name: Afficher le statut du service
+      debug:
+        var: service_status.stdout_lines
+      when: service_status is defined
 
     - name: Nettoyer les fichiers temporaires Linux
       file:
         path: "{{ linux_temp_dir }}"
         state: absent
-      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
