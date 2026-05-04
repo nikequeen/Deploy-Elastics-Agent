@@ -33,7 +33,7 @@
 
     - name: Install Elastic agent with force option (non-interactive)
       shell: |
-        cd "{{ linux_temp_dir }}/elastic-agent/elastic-agent-8.18.8-linux-x86_64"
+        cd "{{ linux_temp_dir }}/elastic-agent-8.18.8-linux-x86_64"
         sudo ./elastic-agent install \
           --url={{ siem_url }} \
           --enrollment-token={{ linux_enrollment_token }} \
